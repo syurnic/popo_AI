@@ -137,3 +137,14 @@ gym.register(
     entry_point=GridWorldEnv,
     max_episode_steps=300,  # Prevent infinite episodes
 )
+
+from gymnasium.utils.env_checker import check_env
+
+env = gym.make("GridWorldEnv")
+
+# This will catch many common issues
+try:
+    check_env(env.unwrapped)
+    print("Environment passes all checks!")
+except Exception as e:
+    print(f"Environment has issues: {e}")
