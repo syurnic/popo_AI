@@ -17,6 +17,8 @@ class GridWorldEnv(gym.Env):
         # Using -1,-1 as "uninitialized" state
         self._agent_location = np.array([-1, -1], dtype=np.int32)
         self._target_location = np.array([-1, -1], dtype=np.int32)
+        
+        self._board_state = np.full((size, size), -1, dtype=np.int16)
 
         # Define what the agent can observe
         # Dict space gives us structured, human-readable observations
@@ -24,6 +26,7 @@ class GridWorldEnv(gym.Env):
             {
                 "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),   # [x, y] coordinates
                 "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),  # [x, y] coordinates
+                "board": gym.spaces.Box(0, 1, shape=(size,size), dtype=int),
             }
         )
 
@@ -45,7 +48,7 @@ class GridWorldEnv(gym.Env):
         Returns:
             dict: Observation with agent and target positions
         """
-        return {"agent": self._agent_location, "target": self._target_location}
+        return {"agent": self._agent_location, "target": self._target_location, "board": self._board_state}
     
     def _get_info(self):
         """Compute auxiliary information for debugging.
@@ -72,12 +75,19 @@ class GridWorldEnv(gym.Env):
         # IMPORTANT: Must call this first to seed the random number generator
         super().reset(seed=seed)
 
+        self._board_state[:,:] = 0
+        for _ in range(5):
+            pos = self.np_random.integers(0, self.size, size=2, dtype=int)
+            self._board_state[pos] = 1
+
         # Randomly place the agent anywhere on the grid
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+        while self._board_state[self._agent_location] == 1:
+            self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
 
         # Randomly place target, ensuring it's different from agent position
         self._target_location = self._agent_location
-        while np.array_equal(self._target_location, self._agent_location):
+        while np.array_equal(self._target_location, self._agent_location) or self._board_state[self._target_location] == 1:
             self._target_location = self.np_random.integers(
                 0, self.size, size=2, dtype=int
             )
@@ -101,9 +111,12 @@ class GridWorldEnv(gym.Env):
 
         # Update agent position, ensuring it stays within grid bounds
         # np.clip prevents the agent from walking off the edge
-        self._agent_location = np.clip(
+        new_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
         )
+        
+        if self._board_state[new_location] != 0:
+            self._agent_location = new_location
 
         # Check if agent reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
