@@ -59,8 +59,7 @@ def to_numpy(v):
 class SoccerEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
-    def __init__(self, size: int = 5, render_mode = "human"):
-        self.size = size
+    def __init__(self, render_mode = "human"):
         self.render_mode = render_mode
         
         # variables
