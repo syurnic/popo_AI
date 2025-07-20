@@ -199,9 +199,9 @@ class SoccerEnv(gym.Env):
 
         self.ball.position = (25, 3)
         self.ball.linearVelocity = (0, 0)
-        self.player1.position = (10, 3)
+        self.player1.position = (self.np_random.random() * 44 + 3, 3)
         self.player1.linearVelocity = (0, 0)
-        self.player2.position = (40, 3)
+        self.player2.position = (50 - self.player1.position.x, 3)
         self.player2.linearVelocity = (0, 0)
         
         self.jump_count["Player1"] = 0
