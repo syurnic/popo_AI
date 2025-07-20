@@ -197,12 +197,19 @@ class SoccerEnv(gym.Env):
         # IMPORTANT: Must call this first to seed the random number generator
         super().reset(seed=seed)
 
-        self.ball.position = (25, 10)
+        self.ball.position = (25, 3)
         self.ball.linearVelocity = (0, 0)
-        self.player1.position = (10, 2)
+        self.player1.position = (10, 3)
         self.player1.linearVelocity = (0, 0)
-        self.player2.position = (40, 2)
+        self.player2.position = (40, 3)
         self.player2.linearVelocity = (0, 0)
+        
+        self.jump_count["Player1"] = 0
+        self.jump_count["Player2"] = 0
+        self.invalidate_jump["Player1"] = 0
+        self.invalidate_jump["Player2"] = 0
+        self.terminated = False
+        self.winner = None
 
         observation = self._get_obs()
         info = self._get_info()

@@ -37,6 +37,8 @@ for i in range(1000):
         action[1] = 4
     
     obs, reward, terminated, truncated, info = env.step(action)
+
+    print(obs)
     
     if terminated or truncated:
         print(info["winner"])
