@@ -10,48 +10,6 @@ import plot
 from soccer.soccer_env import SoccerEnv
 import performance_log
 
-class DummyVecSoccerEnv:
-    """
-    SoccerEnv를 여러 개 묶어서 벡터라이즈 환경처럼 동작하게 하는 더미 클래스.
-    병렬처리는 하지 않고, 내부적으로 리스트로 관리하며 step/reset을 한 번에 처리한다.
-    """
-    def __init__(self, env_fns):
-        self.envs = [fn() for fn in env_fns]
-        self.num_envs = len(self.envs)
-
-    def reset(self):
-        obs, infos = [], []
-        for env in self.envs:
-            o, i = env.reset()
-            obs.append(o)
-            infos.append(i)
-        obs = torch.tensor(np.array(obs), dtype=torch.float32, device=config.device)
-        return obs, infos
-
-    def step(self, actions):
-        # actions: Tensor of shape [num_envs, 2]
-        obs, rewards, dones, truncs, infos = [], [], [], [], []
-        
-        for i, env in enumerate(self.envs):
-            action = actions[i]
-            o, r, d, t, info = env.step(action.tolist())
-            
-            obs.append(o)
-            rewards.append(r)
-            dones.append(d)
-            truncs.append(t)
-            infos.append(info)
-        
-        obs = torch.tensor(np.array(obs), dtype=torch.float32, device=config.device)
-        rewards = torch.tensor(rewards, dtype=torch.float32, device=config.device)
-        dones = torch.tensor(dones, dtype=torch.bool, device=config.device)
-        truncs = torch.tensor(truncs, dtype=torch.bool, device=config.device)
-        return obs, rewards, dones, truncs, infos
-
-    def render(self):
-        # 각 환경의 render 결과를 리스트로 반환
-        return [env.render() for env in self.envs]
-
 
 def compute_rewards(states, observations, infos):
     # states: [batch, obs_dim], observations: [batch, obs_dim], infos: list of dicts

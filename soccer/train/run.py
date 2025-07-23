@@ -11,7 +11,7 @@ import config
 import episode_loops
 
 import soccer.soccer_env  # 환경 등록
-from soccer.train.episode_loops import DummyVecSoccerEnv
+from ParallelVecSoccerEnv import ParallelVecSoccerEnv
 from soccer.soccer_env import SoccerEnv
 
 import performance_log
@@ -21,7 +21,7 @@ NUM_ENVS = 4
 
 def main():
     env_fns = [lambda: FlattenObservation(gym.make("SoccerEnv", render_mode="rgb_array")) for _ in range(NUM_ENVS)]
-    vec_env = DummyVecSoccerEnv(env_fns)
+    vec_env = ParallelVecSoccerEnv(env_fns)
     agent1 = agent.DQNAgent(model.DQN, vec_env.envs[0].observation_space, vec_env.envs[0].action_space[0], label="Player1")
     agent2 = agent.DQNAgent(model.DQN, vec_env.envs[0].observation_space, vec_env.envs[0].action_space[1], label="Player2")
 
