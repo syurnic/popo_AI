@@ -1,5 +1,6 @@
 import torch
 import random
+import config
 
 class ReplayMemory:
     def __init__(self, capacity, state_dim):
@@ -10,6 +11,11 @@ class ReplayMemory:
         self.actions = torch.zeros((capacity, 1), dtype=torch.long)
         self.next_states = torch.zeros((capacity, state_dim), dtype=torch.float32)
         self.rewards = torch.zeros((capacity, 1), dtype=torch.float32)
+
+        self.states_device = self.states.to(config.device)
+        self.actions_device = self.actions.to(config.device)
+        self.next_states_device = self.next_states.to(config.device)
+        self.rewards_device = self.rewards.to(config.device)
 
     def push(self, state, action, next_state, reward):
         self.states[self.position] = state
@@ -48,12 +54,18 @@ class ReplayMemory:
         self.size = min(self.size + batch_size, self.capacity)
 
     def sample(self, batch_size):
-        idx = torch.randint(0, self.size, (batch_size,))
-        states = self.states[idx]
-        actions = self.actions[idx]
-        next_states = self.next_states[idx]
-        rewards = self.rewards[idx]
+        idx = torch.randint(0, self.size, (batch_size,), device=config.device)
+        states = self.states_device[idx]
+        actions = self.actions_device[idx]
+        next_states = self.next_states_device[idx]
+        rewards = self.rewards_device[idx]
         return states, actions, next_states, rewards
+    
+    def update_device_tensors(self, device):
+        self.states_device = self.states.to(device)
+        self.actions_device = self.actions.to(device)
+        self.next_states_device = self.next_states.to(device)
+        self.rewards_device = self.rewards.to(device)
 
     def __len__(self):
         return self.size 

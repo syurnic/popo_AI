@@ -12,9 +12,13 @@ import performance_log
 import time
 import matplotlib.pyplot as plt
 import random
+import threading
 
 # 파일 상단에 loss_history 리스트 추가
 loss_history = []
+loss_update_condition = threading.Condition()
+loss_count = 0
+loss_count_lock = threading.Lock()
 
 def compute_rewards(states, observations, infos):
     # states: [batch, obs_dim], observations: [batch, obs_dim], infos: list of dicts
@@ -88,17 +92,29 @@ def simulate_step(env, agent1, agent2, states, done, render=True):
     return next_states, rewards, step_done, actions1, actions2
 
 def optimize_agents_loop(agent1, agent2, stop_event):
-    global loss_history
+    global loss_count
+
     while not stop_event.is_set():
         loss1 = agent1.optimize_model()
         loss2 = agent2.optimize_model()
         if loss1 is not None and loss2 is not None:
             loss_history.append((loss1 + loss2) / 2)
-            
+
+        with loss_update_condition:
+            with loss_count_lock:
+                loss_count += 1
+            loss_update_condition.notify_all()
+
         agent1.soft_update_target()
         agent2.soft_update_target()
 
+        if random.random() < 0.01:
+            agent1.update_memory_device()
+            agent2.update_memory_device()
+
 def train_loop(env, agent1, agent2, num_episodes=100, render=True, reset=True):
+    global loss_count
+
     if reset:
         agent1.reset_steps()
         agent2.reset_steps()
@@ -116,6 +132,14 @@ def train_loop(env, agent1, agent2, num_episodes=100, render=True, reset=True):
         episode_steps = []
 
         for t in count():
+            with loss_update_condition:
+                while True:
+                    with loss_count_lock:
+                        if loss_count > config.LOSS_UPDATE_INTERVAL:
+                            loss_count = 0
+                            break
+                    loss_update_condition.wait()
+
             print(f"{t}\r", end="")
 
             performance_log.log_performance("train_loop_step")

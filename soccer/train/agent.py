@@ -61,7 +61,8 @@ class DQNAgent:
         self.gamma = gamma
         self.tau = tau
         self.eval_mode = False  # 평가 모드 여부
-        self.lock = threading.Lock()
+        self.lock_target_net = threading.Lock()
+        self.lock_memory = threading.Lock()
 
     def set_eval_mode(self, mode: bool):
         self.eval_mode = mode
@@ -96,7 +97,7 @@ class DQNAgent:
             if use_cpu:
                 q_values = self.target_net_cpu(state)
             else:
-                q_values = self.policy_net(state)
+                q_values = self.target_net(state)
             probs = torch.nn.functional.softmax(q_values, dim=1)
             actions = torch.multinomial(probs, num_samples=1)
             return actions
@@ -107,11 +108,11 @@ class DQNAgent:
 
     def store_transition(self, states, actions, next_states, rewards):
         # states, actions, next_states, rewards: [batch, ...] 형태
-        with self.lock:
+        with self.lock_memory:
             self.memory.push_batch(states, actions, next_states, rewards)
 
     def optimize_model(self):
-        with self.lock:
+        with self.lock_target_net:
             if self.memory.size < config.BATCH_SIZE:
                 return None
             states, actions, next_states, rewards = self.memory.sample(config.BATCH_SIZE)
@@ -119,17 +120,13 @@ class DQNAgent:
             non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, next_states)), device=config.device, dtype=torch.bool)
             non_final_next_states = torch.stack([s for s in next_states if s is not None]).to(config.device)
 
-            state_batch = states.to(config.device)
-            action_batch = actions.to(config.device)
-            reward_batch = rewards.to(config.device)
+            state_action_values = self.policy_net(states).gather(1, actions)
 
-            state_action_values = self.policy_net(state_batch).gather(1, action_batch)
-            
             next_state_values = torch.zeros(config.BATCH_SIZE, device=config.device)
             with torch.no_grad():
                 next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1).values
-            expected_state_action_values = (next_state_values * self.gamma) + reward_batch.squeeze(1)
-            
+            expected_state_action_values = (next_state_values * self.gamma) + rewards.squeeze(1)
+
             criterion = nn.SmoothL1Loss()
             loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
             self.optimizer.zero_grad()
@@ -139,7 +136,7 @@ class DQNAgent:
             return loss.item()
 
     def soft_update_target(self):
-        with self.lock:
+        with self.lock_target_net:
             target_net_state_dict = self.target_net.state_dict()
             policy_net_state_dict = self.policy_net.state_dict()
             for key in policy_net_state_dict:
@@ -147,8 +144,12 @@ class DQNAgent:
             self.target_net.load_state_dict(target_net_state_dict)
     
     def update_target_net_cpu(self):
-        with self.lock:
+        with self.lock_target_net:
             self.target_net_cpu.load_state_dict(self.target_net.state_dict())
+    
+    def update_memory_device(self):
+        with self.lock_memory:
+            self.memory.update_device_tensors(config.device)
 
     def load_model(self, path):
         state_dict = torch.load(path, map_location=config.device)

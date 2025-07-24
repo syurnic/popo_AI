@@ -7,6 +7,7 @@ import gymnasium as gym
 from gymnasium.wrappers import FlattenObservation
 
 import threading
+import time
 
 import model
 import agent
@@ -21,7 +22,7 @@ performance_log.clear_performance()
 
 performance_log.USE_LOG = True
 
-NUM_ENVS = 256
+NUM_ENVS = 64
 
 def main():
     print(config.device)
