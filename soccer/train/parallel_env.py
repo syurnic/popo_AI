@@ -8,13 +8,15 @@ class ParallelVecSoccerEnv:
         self.envs = [fn() for fn in env_fns]
         self.num_envs = len(self.envs)
 
+        self.device = "cpu"
+
     def reset(self):
         obs, infos = [], []
         for env in self.envs:
             o, i = env.reset()
             obs.append(o)
             infos.append(i)
-        obs = torch.tensor(np.array(obs), dtype=torch.float32, device=config.device)
+        obs = torch.tensor(np.array(obs), dtype=torch.float32, device=self.device)
         return obs, infos
 
     def step(self, actions):
@@ -35,10 +37,10 @@ class ParallelVecSoccerEnv:
             truncs.append(t)
             infos.append(info)
 
-        obs = torch.tensor(np.array(obs), dtype=torch.float32, device=config.device)
-        rewards = torch.tensor(rewards, dtype=torch.float32, device=config.device)
-        dones = torch.tensor(dones, dtype=torch.bool, device=config.device)
-        truncs = torch.tensor(truncs, dtype=torch.bool, device=config.device)
+        obs = torch.tensor(np.array(obs), dtype=torch.float32, device=self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
+        dones = torch.tensor(dones, dtype=torch.bool, device=self.device)
+        truncs = torch.tensor(truncs, dtype=torch.bool, device=self.device)
         return obs, rewards, dones, truncs, infos
 
     def render(self):

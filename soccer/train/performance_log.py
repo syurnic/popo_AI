@@ -3,13 +3,21 @@ import time
 PERFORMANCE_LOG = {}
 LABEL_SEQUENCE = []
 
+USE_LOG = True
+
 def log_performance(label):
+    if not USE_LOG:
+        return
+
     if label not in PERFORMANCE_LOG:
         PERFORMANCE_LOG[label] = []
         LABEL_SEQUENCE.append(label)
     PERFORMANCE_LOG[label].append(time.time())
     
 def print_performance():
+    if not USE_LOG:
+        return
+    
     for i in range(len(LABEL_SEQUENCE) - 1):
         label_before = LABEL_SEQUENCE[i]
         label_after = LABEL_SEQUENCE[i + 1]

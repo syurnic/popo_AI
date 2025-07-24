@@ -314,7 +314,7 @@ class SoccerEnv(gym.Env):
 gym.register(
     id="SoccerEnv",
     entry_point=SoccerEnv,
-    max_episode_steps=1000,  # Prevent infinite episodes
+    max_episode_steps=100,  # Prevent infinite episodes
 )
 
 if __name__ == "__main__":
