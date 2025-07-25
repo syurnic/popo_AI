@@ -1,42 +1,61 @@
 import torch
 import numpy as np
 import config
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing as mp
+import gymnasium as gym
+from gymnasium.wrappers import FlattenObservation
+
+def _worker(remote, idx):
+    env = FlattenObservation(gym.make("SoccerEnv", render_mode="rgb_array"))
+    try:
+        while True:
+            cmd, data = remote.recv()
+            if cmd == 'step':
+                ob, reward, done, trunc, info = env.step(data.tolist())
+                remote.send((ob, reward, done, trunc, info))
+            elif cmd == 'reset':
+                ob, info = env.reset()
+                remote.send((ob, info))
+            elif cmd == 'render':
+                frame = env.render()  # numpy array
+                remote.send(frame)
+            elif cmd == 'close':
+                remote.close()
+                break
+            else:
+                raise NotImplementedError(f"Unknown command: {cmd}")
+    except KeyboardInterrupt:
+        pass
 
 class ParallelVecSoccerEnv:
-    def __init__(self, env_fns):
-        self.envs = [fn() for fn in env_fns]
-        self.num_envs = len(self.envs)
-
+    def __init__(self, num_envs):
+        self.num_envs = num_envs
+        self.remotes, self.work_remotes = zip(*[mp.Pipe() for _ in range(self.num_envs)])
+        self.processes = []
+        for idx, work_remote in enumerate(self.work_remotes):
+            p = mp.Process(target=_worker, args=(work_remote, idx))
+            p.daemon = True
+            p.start()
+            self.processes.append(p)
+            work_remote.close()
         self.device = "cpu"
+        # 관찰/액션 스페이스를 하나의 더미 env로부터 얻음
+        dummy_env = FlattenObservation(gym.make("SoccerEnv", render_mode="rgb_array"))
+        self.envs = [dummy_env]  # 관찰/액션 스페이스 참조용
 
     def reset(self):
-        obs, infos = [], []
-        for env in self.envs:
-            o, i = env.reset()
-            obs.append(o)
-            infos.append(i)
+        for remote in self.remotes:
+            remote.send(('reset', None))
+        results = [remote.recv() for remote in self.remotes]
+        obs, infos = zip(*results)
         obs = torch.tensor(np.array(obs), dtype=torch.float32, device=self.device)
         return obs, infos
 
     def step(self, actions):
-        # actions: Tensor of shape [num_envs, 2]
-        obs, rewards, dones, truncs, infos = [], [], [], [], []
-
-        def step_env(args):
-            env, action = args
-            return env.step(action.tolist())
-
-        with ThreadPoolExecutor(max_workers=self.num_envs) as executor:
-            results = list(executor.map(step_env, zip(self.envs, actions)))
-
-        for o, r, d, t, info in results:
-            obs.append(o)
-            rewards.append(r)
-            dones.append(d)
-            truncs.append(t)
-            infos.append(info)
-
+        for remote, action in zip(self.remotes, actions):
+            remote.send(('step', action))
+        results = [remote.recv() for remote in self.remotes]
+        obs, rewards, dones, truncs, infos = zip(*results)
         obs = torch.tensor(np.array(obs), dtype=torch.float32, device=self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         dones = torch.tensor(dones, dtype=torch.bool, device=self.device)
@@ -44,5 +63,13 @@ class ParallelVecSoccerEnv:
         return obs, rewards, dones, truncs, infos
 
     def render(self):
-        # 각 환경의 render 결과를 리스트로 반환
-        return [env.render() for env in self.envs]
+        for remote in self.remotes:
+            remote.send(('render', None))
+        frames = [remote.recv() for remote in self.remotes]
+        return frames
+
+    def close(self):
+        for remote in self.remotes:
+            remote.send(('close', None))
+        for p in self.processes:
+            p.join()

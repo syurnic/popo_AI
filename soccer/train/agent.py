@@ -16,7 +16,7 @@ class DQNAgent:
         observation_space,
         action_space,
         label: str,
-        memory_capacity: int = 10000,
+        memory_capacity: int = 100000,
         lr: float = config.LR,
         gamma: float = config.GAMMA,
         tau: float = config.TAU,
@@ -78,7 +78,7 @@ class DQNAgent:
         """
         batch_size = state.shape[0]
         if self.eval_mode:
-            if random.random() < config.EPS_END:
+            if random.random() < config.EPS_END * 0.1:
                 return torch.tensor([self.action_space.sample() for _ in range(batch_size)], dtype=torch.long, device=state.device).reshape((-1, 1))
             else:
                 with torch.no_grad():

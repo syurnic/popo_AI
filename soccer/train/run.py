@@ -20,15 +20,15 @@ from parallel_env import ParallelVecSoccerEnv
 import performance_log
 performance_log.clear_performance()
 
-performance_log.USE_LOG = True
+performance_log.USE_LOG = False
 
-NUM_ENVS = 16
+NUM_ENVS = 32
 
 def main():
     print(config.device)
 
-    env_fns = [lambda: FlattenObservation(gym.make("SoccerEnv", render_mode="rgb_array")) for _ in range(NUM_ENVS)]
-    vec_env = ParallelVecSoccerEnv(env_fns)
+    # env_fns = [lambda: FlattenObservation(gym.make("SoccerEnv", render_mode="rgb_array")) for _ in range(NUM_ENVS)]
+    vec_env = ParallelVecSoccerEnv(NUM_ENVS)
     agent1 = agent.DQNAgent(model.DQN, vec_env.envs[0].observation_space, vec_env.envs[0].action_space[0], label="Player1")
     agent2 = agent.DQNAgent(model.DQN, vec_env.envs[0].observation_space, vec_env.envs[0].action_space[1], label="Player2")
 

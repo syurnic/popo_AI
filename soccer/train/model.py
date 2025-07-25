@@ -13,7 +13,7 @@ STATE_SCALE = {
 class DQN(nn.Module):
     def __init__(self, n_observations, n_actions, label):
         super(DQN, self).__init__()
-        d_model = 8
+        d_model = 16
         self.layer1 = nn.Linear(n_observations, d_model)
         self.layer2 = nn.Linear(d_model, d_model)
         self.layer3 = nn.Linear(d_model, n_actions)
