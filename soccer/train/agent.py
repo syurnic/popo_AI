@@ -76,31 +76,37 @@ class DQNAgent:
         state: torch.Tensor, shape [batch, obs_dim]
         return: torch.Tensor, shape [batch, 1]
         """
-        # batch_size = state.shape[0]
-        # if self.eval_mode:
-        #     with torch.no_grad():
-        #         return self.policy_net(state).max(1).indices.view(batch_size, 1)
-        # 
-        # sample = torch.rand(batch_size, device=state.device)
-        # eps_threshold = config.EPS_END + (config.EPS_START - config.EPS_END) * math.exp(-1. * self.steps_done / config.EPS_DECAY)
-        #
-        # self.steps_done += batch_size
-        #
-        # greedy = sample > eps_threshold
-        # 
-        # #actions = torch.zeros((batch_size, 1), dtype=torch.long, device=state.device)
-        # actions = torch.tensor([self.action_space.sample() for _ in range(batch_size)], dtype=torch.long, device=state.device).reshape((-1, 1))
-        # with torch.no_grad():
-        #     actions[greedy] = self.policy_net(state[greedy]).max(1).indices.view(-1, 1)
-        # return actions
+        batch_size = state.shape[0]
+        if self.eval_mode:
+            if random.random() < config.EPS_END:
+                return torch.tensor([self.action_space.sample() for _ in range(batch_size)], dtype=torch.long, device=state.device).reshape((-1, 1))
+            else:
+                with torch.no_grad():
+                    return self.policy_net(state.to(config.device)).max(1).indices.view(batch_size, 1).to(state.device)
+        
+        sample = torch.rand(batch_size, device=state.device)
+        eps_threshold = config.EPS_END + (config.EPS_START - config.EPS_END) * math.exp(-1. * self.steps_done / config.EPS_DECAY)
+        
+        self.steps_done += batch_size
+        
+        greedy = sample > eps_threshold
+        
+        #actions = torch.zeros((batch_size, 1), dtype=torch.long, device=state.device)
+        actions = torch.tensor([self.action_space.sample() for _ in range(batch_size)], dtype=torch.long, device=state.device).reshape((-1, 1))
         with torch.no_grad():
             if use_cpu:
-                q_values = self.target_net_cpu(state)
+                actions[greedy] = self.target_net_cpu(state[greedy]).max(1).indices.view(-1, 1)
             else:
-                q_values = self.target_net(state)
-            probs = torch.nn.functional.softmax(q_values, dim=1)
-            actions = torch.multinomial(probs, num_samples=1)
-            return actions
+                actions[greedy] = self.target_net(state[greedy]).max(1).indices.view(-1, 1)
+        return actions
+        # with torch.no_grad():
+        #     if use_cpu:
+        #         q_values = self.target_net_cpu(state)
+        #     else:
+        #         q_values = self.target_net(state)
+        #     probs = torch.nn.functional.softmax(q_values, dim=1)
+        #     actions = torch.multinomial(probs, num_samples=1)
+        #     return actions
 
     def reset_steps(self):
         """epsilon-greedy step 수를 0으로 초기화"""

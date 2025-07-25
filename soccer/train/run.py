@@ -22,7 +22,7 @@ performance_log.clear_performance()
 
 performance_log.USE_LOG = True
 
-NUM_ENVS = 64
+NUM_ENVS = 16
 
 def main():
     print(config.device)
