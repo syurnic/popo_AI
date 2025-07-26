@@ -26,7 +26,7 @@ class DQNAgent:
         DQN 에이전트 초기화
         """
         self.action_space = action_space
-        self.n_actions = action_space.n
+        self.n_actions = action_space.n + 2
         self.label = label
         
         n_observations = observation_space.shape[0]
@@ -71,42 +71,69 @@ class DQNAgent:
         else:
             self.policy_net.train()
 
+    def _process_action_mapping(self, actions: torch.Tensor) -> torch.Tensor:
+        """
+        액션 매핑 후처리: 특수 액션 인덱스를 실제 액션으로 변환
+        """
+        # 1 or 3 (n_actions - 2 인덱스를 1 또는 3으로 랜덤 매핑)
+        idx = (actions == self.n_actions - 2)
+        if any(idx):
+            actions[idx] = torch.randint(0, 2, (idx.sum().item(),), device=actions.device) * 2 + 1
+        
+        # 2 or 3 (n_actions - 1 인덱스를 2 또는 3으로 랜덤 매핑)
+        idx = (actions == self.n_actions - 1)
+        if any(idx):
+            actions[idx] = torch.randint(0, 2, (idx.sum().item(),), device=actions.device) + 2
+        
+        return actions
+
     def select_action(self, state: torch.Tensor, use_cpu: bool = False) -> torch.Tensor:
         """
         state: torch.Tensor, shape [batch, obs_dim]
         return: torch.Tensor, shape [batch, 1]
         """
         batch_size = state.shape[0]
-        if self.eval_mode:
-            if random.random() < config.EPS_END * 0.1:
-                return torch.tensor([self.action_space.sample() for _ in range(batch_size)], dtype=torch.long, device=state.device).reshape((-1, 1))
-            else:
-                with torch.no_grad():
-                    return self.policy_net(state.to(config.device)).max(1).indices.view(batch_size, 1).to(state.device)
         
+        if self.eval_mode:
+            # 평가 모드: 낮은 확률로 랜덤 액션 선택
+            if random.random() < config.EPS_END * 0.1:
+                actions = torch.tensor(
+                    [self.action_space.sample() for _ in range(batch_size)], 
+                    dtype=torch.long, 
+                    device=state.device
+                ).reshape((-1, 1))
+            else:
+                # 그리디 액션 선택
+                with torch.no_grad():
+                    actions = self.policy_net(state.to(config.device)).max(1).indices.view(batch_size, 1).to(state.device)
+
+            # 액션 매핑 후처리
+            return self._process_action_mapping(actions)
+        
+        # 학습 모드: epsilon-greedy 정책
         sample = torch.rand(batch_size, device=state.device)
         eps_threshold = config.EPS_END + (config.EPS_START - config.EPS_END) * math.exp(-1. * self.steps_done / config.EPS_DECAY)
         
         self.steps_done += batch_size
-        
         greedy = sample > eps_threshold
         
-        #actions = torch.zeros((batch_size, 1), dtype=torch.long, device=state.device)
-        actions = torch.tensor([self.action_space.sample() for _ in range(batch_size)], dtype=torch.long, device=state.device).reshape((-1, 1))
+        # 기본적으로 랜덤 액션으로 초기화
+        actions = torch.tensor(
+            [self.action_space.sample() for _ in range(batch_size)], 
+            dtype=torch.long, 
+            device=state.device
+        ).reshape((-1, 1))
+
+        # 그리디한 경우 네트워크에서 액션 선택
         with torch.no_grad():
             if use_cpu:
-                actions[greedy] = self.target_net_cpu(state[greedy]).max(1).indices.view(-1, 1)
+                network_actions = self.target_net_cpu(state[greedy]).max(1).indices.view(-1, 1)
             else:
-                actions[greedy] = self.target_net(state[greedy]).max(1).indices.view(-1, 1)
-        return actions
-        # with torch.no_grad():
-        #     if use_cpu:
-        #         q_values = self.target_net_cpu(state)
-        #     else:
-        #         q_values = self.target_net(state)
-        #     probs = torch.nn.functional.softmax(q_values, dim=1)
-        #     actions = torch.multinomial(probs, num_samples=1)
-        #     return actions
+                network_actions = self.target_net(state[greedy]).max(1).indices.view(-1, 1)
+            
+            actions[greedy] = network_actions
+        
+        return actions # 훈련 모드의 경우 후처리를 하지 않음
 
     def reset_steps(self):
         """epsilon-greedy step 수를 0으로 초기화"""

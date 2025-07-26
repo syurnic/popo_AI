@@ -11,7 +11,7 @@ LR = 1e-3
 LOSS_UPDATE_INTERVAL = 16
 
 # 모델 버전 번호 (에피소드별 저장용)
-MODEL_VERSION = 33
+MODEL_VERSION = 15
 
 # 디바이스 설정
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

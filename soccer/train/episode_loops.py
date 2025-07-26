@@ -77,7 +77,10 @@ def simulate_step(env, agent1, agent2, states, done, render=True):
     performance_log.log_performance("simulate_step_select_action")
     actions1 = agent1.select_action(states, use_cpu=True)
     actions2 = agent2.select_action(states, use_cpu=True)
-    actions = torch.cat([actions1, actions2], dim=1)
+
+    actions1_processed = agent1._process_action_mapping(actions1)
+    actions2_processed = agent2._process_action_mapping(actions2)
+    actions = torch.cat([actions1_processed, actions2_processed], dim=1)
     
     performance_log.log_performance("simulate_step_env_step")
     observations, rewards, terminated, truncated, infos = env.step(actions)
