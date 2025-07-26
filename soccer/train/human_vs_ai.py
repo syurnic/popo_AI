@@ -62,6 +62,8 @@ def main():
 
         obs, reward, terminated, truncated, info = vec_env.step(action)
 
+        print(obs[2])
+
         if terminated or truncated:
             print(info["winner"])
             break

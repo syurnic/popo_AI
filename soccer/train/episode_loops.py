@@ -23,17 +23,27 @@ loss_count_lock = threading.Lock()
 def compute_rewards(states, observations, infos):
     # states: [batch, obs_dim], observations: [batch, obs_dim], infos: list of dicts
     # Ball, Player1, Player2 위치 인덱스: 0:2, 4:6, 8:10
-    d1 = torch.norm(states[:, 0:2] - states[:, 4:6], dim=1)
-    d2 = torch.norm(states[:, 0:2] - states[:, 8:10], dim=1)
-    d3 = torch.norm(observations[:, 0:2] - observations[:, 4:6], dim=1)
-    d4 = torch.norm(observations[:, 0:2] - observations[:, 8:10], dim=1)
+    b1 = observations[:, 0] - observations[:, 4]
+    b1[b1 < 0] -= 30
+    b1 = -torch.abs(b1) * 0.01 + 0.05
+    b1 = torch.clip(b1, -0.3, 0)
+    b2 = observations[:, 0] - observations[:, 8]
+    b2[b2 > 0] += 30
+    b2 = -torch.abs(b2) * 0.01 + 0.05
+    b2 = torch.clip(b2, -0.3, 0)
 
-    reward1 = torch.tensor([int(info["winner"] == "Player1") for info in infos], device=states.device) * 10
-    reward2 = torch.tensor([int(info["winner"] == "Player2") for info in infos], device=states.device) * 10
+    v = observations[:, 2]
+    v1 = torch.clip(v * 0.1, -0.3, 0.3)
+    v2 = torch.clip(v * -0.1, -0.3, 0.3)
+
+    reward1 = torch.tensor([int(info["winner"] == "Player1") for info in infos], device=states.device, dtype=torch.float32) * 10
+    reward2 = torch.tensor([int(info["winner"] == "Player2") for info in infos], device=states.device, dtype=torch.float32) * 10
 
     reward1, reward2 = reward1 - reward2, reward2 - reward1
-    reward1 = reward1 + (d1 - d3)
-    reward2 = reward2 + (d2 - d4)
+
+    reward1 += v1 + b1
+    reward2 += v2 + b2
+
     rewards = torch.stack([reward1, reward2], dim=1)
     return rewards
 
